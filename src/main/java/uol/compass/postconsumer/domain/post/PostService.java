@@ -40,11 +40,9 @@ public class PostService {
             post = new Post();
             post.setId(id);
             historyService.newHistory(post, Status.CREATED);
+            populatePost(id, post);
         } else {
             post = postAlreadyExists.get();
-            if (post.getProcessed_at().isBefore(LocalDateTime.now().plusSeconds(5))){
-                return post;
-            }
 
             if (!post.getIsEnabled()){
                 throw new ResponseStatusException(
@@ -57,10 +55,9 @@ public class PostService {
         return post;
     }
 
-    public Post populatePost(Integer id) {
+    public Post populatePost(Integer id, Post post) {
         var response = fetch.getForEntity(Constants.EXTERNAL_API_POST + "/" + id, Post.class);
 
-        Post post = fetchPost(id);
         validateResponse(response, post);
 
         historyService.newHistory(post, Status.POST_FIND);
@@ -96,24 +93,27 @@ public class PostService {
            );
 
        historyService.newHistory(post, Status.DISABLED);
-       return post;
+       post.setIsEnabled(false);
+       return postRepository.save(post);
     }
 
     public Post reprocessPost(Integer id){
+        // todo finish logic
         Post post = fetchPost(id);
-        List<History> histories = post.getHistory();
-        if(histories.get(histories.size() - 1).getStatus() != Status.ENABLED
-            || histories.get(histories.size() - 1).getStatus() != Status.DISABLED)
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "this post must be enabled or disabled for reprocess"
-            );
-
-        if(post.getProcessed_at().isBefore(LocalDateTime.now().plusSeconds(5)))
-            return post;
-
-
-        return populatePost(id);
+        return post;
+//        List<History> histories = post.getHistory();
+//        if(histories.get(histories.size() - 1).getStatus() != Status.ENABLED
+//            && histories.get(histories.size() - 1).getStatus() != Status.DISABLED)
+//            throw new ResponseStatusException(
+//                    HttpStatus.BAD_REQUEST,
+//                    "this post must be enabled or disabled for reprocess"
+//            );
+//
+//        if(post.getProcessed_at().isAfter(LocalDateTime.now().plusSeconds(5)))
+//            return post;
+//
+//
+//        return populatePost(id, post);
     }
 
     private void fetchComment(Post post) {
