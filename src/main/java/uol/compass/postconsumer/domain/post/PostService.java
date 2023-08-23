@@ -1,0 +1,169 @@
+package uol.compass.postconsumer.domain.post;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.server.ResponseStatusException;
+import uol.compass.postconsumer.application.dto.ResponseDTO;
+import uol.compass.postconsumer.domain.Status.Status;
+import uol.compass.postconsumer.domain.comment.Comment;
+import uol.compass.postconsumer.domain.history.History;
+import uol.compass.postconsumer.domain.history.HistoryService;
+import uol.compass.postconsumer.infrastructure.utils.Constants;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+@Service
+public class PostService {
+
+    private final PostRepository postRepository;
+    private final HistoryService historyService;
+    private final RestTemplate fetch = new RestTemplate();
+
+    public PostService(PostRepository postRepository, HistoryService historyService) {
+        this.postRepository = postRepository;
+        this.historyService = historyService;
+    }
+
+    public Post fetchPost(Integer id){
+        Optional<Post> postAlreadyExists = postRepository.findById(id);
+        Post post;
+        if(postAlreadyExists.isEmpty()){
+            post = new Post();
+            post.setId(id);
+            historyService.newHistory(post, Status.CREATED);
+        } else {
+            post = postAlreadyExists.get();
+            if (post.getProcessed_at().isBefore(LocalDateTime.now().plusSeconds(5))){
+                return post;
+            }
+
+            if (!post.getIsEnabled()){
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "this post is disabled"
+                );
+            }
+        }
+
+        return post;
+    }
+
+    public Post populatePost(Integer id) {
+        var response = fetch.getForEntity(Constants.EXTERNAL_API_POST + "/" + id, Post.class);
+
+        Post post = fetchPost(id);
+        validateResponse(response, post);
+
+        historyService.newHistory(post, Status.POST_FIND);
+
+        if (response.getBody() == null) {
+            historyService.newHistory(post, Status.FAILED);
+            historyService.newHistory(post, Status.DISABLED);
+
+            throw new ResponseStatusException(
+                    HttpStatus.NO_CONTENT,
+                    "cannot retrieve data from post"
+            );
+        }
+
+        historyService.newHistory(post, Status.POST_OK);
+
+        post.setTitle(response.getBody().getTitle());
+        post.setBody(response.getBody().getBody());
+
+        fetchComment(post);
+        post.setProcessed_at(LocalDateTime.now());
+
+        return postRepository.save(post);
+    }
+
+    public Post disablePost(Integer id){
+       Post post = fetchPost(id);
+
+       if (!post.getIsEnabled())
+           throw new ResponseStatusException(
+                   HttpStatus.BAD_REQUEST,
+                   "this post is already disabled"
+           );
+
+       historyService.newHistory(post, Status.DISABLED);
+       return post;
+    }
+
+    public Post reprocessPost(Integer id){
+        Post post = fetchPost(id);
+        List<History> histories = post.getHistory();
+        if(histories.get(histories.size() - 1).getStatus() != Status.ENABLED
+            || histories.get(histories.size() - 1).getStatus() != Status.DISABLED)
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "this post must be enabled or disabled for reprocess"
+            );
+
+        if(post.getProcessed_at().isBefore(LocalDateTime.now().plusSeconds(5)))
+            return post;
+
+
+        return populatePost(id);
+    }
+
+    private void fetchComment(Post post) {
+        RestTemplate fetch = new RestTemplate();
+        var response = fetch.getForEntity(
+                Constants.EXTERNAL_API_POST + "/" + post.getId() + "/comments",
+                Comment[].class
+        );
+        historyService.newHistory(post, Status.COMMENT_FIND);
+        validateResponse(response, post);
+
+        if (response.getBody() == null) {
+            historyService.newHistory(post, Status.FAILED);
+            historyService.newHistory(post, Status.DISABLED);
+
+            throw new ResponseStatusException(
+                    HttpStatus.NO_CONTENT,
+                    "cannot retrieve comments from post"
+            );
+        }
+
+        post.getComments().addAll(List.of(response.getBody()));
+        historyService.newHistory(post, Status.COMMENT_OK);
+
+        post.setIsEnabled(true);
+        historyService.newHistory(post, Status.ENABLED);
+    }
+
+    public void validateResponse(ResponseEntity<?> response, Post post) {
+        if (response.getStatusCode().isError()) {
+            historyService.newHistory(post, Status.FAILED);
+            historyService.newHistory(post, Status.DISABLED);
+            postRepository.save(post);
+
+            throw new ResponseStatusException(
+                    HttpStatus.valueOf(
+                            response.getStatusCode().value()
+                    ),
+                    "An error occurred while fetching the api, post marked as failed"
+            );
+        }
+    }
+
+    public List<Post> getAll(Integer pageNumber, Integer size, String sortBy, String direction) {
+        Pageable pageable;
+        if(direction.equalsIgnoreCase("asc"))
+            pageable = PageRequest.of(pageNumber, size, Sort.Direction.ASC, sortBy);
+        else
+            pageable = PageRequest.of(pageNumber, size, Sort.Direction.DESC, sortBy);
+        Page<Post> page = postRepository.findAll(pageable);
+        return page.get().collect(Collectors.toList());
+    }
+}
