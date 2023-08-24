@@ -5,6 +5,11 @@ This project is a challenge from internship program Compass.uol
 This server will receive a request to search a post from https://jsonplaceholder.typicode.com/posts and process the response, adding actions history, like created, post_find, comment_find, failed etc.
 
 
+## Flow
+
+After request on ```POST /posts/${id}``` an internal flow will be started, fetching the post and assiging histories to him and at end, will be returned the post processed 
+
+
 ## API Docs
 
 #### Get all processed posts
@@ -15,10 +20,9 @@ This server will receive a request to search a post from https://jsonplaceholder
 
 | Parameter   | Type       | Description                           |
 | :---------- | :--------- | :---------------------------------- |
-| `size` | `string` | **Optional** change page size|
+| `pageSize` | `string` | **Optional** change page size|
 | `pageNumber` | `string` | **Optional** change page|
 | `direction` | `string` | **Optional** change order [asc, desc]|
-| `sortBy` | `string` | **Optional** change filter to sort|
 
 #### Process a post
 
