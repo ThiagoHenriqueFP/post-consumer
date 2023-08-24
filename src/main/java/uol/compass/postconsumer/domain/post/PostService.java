@@ -71,18 +71,23 @@ public class PostService {
 
             fetchComments(post, post.getId());
             post.setProcessed_at(LocalDateTime.now());
-        } catch (Exception e){
+        } catch (Exception e) {
             historyService.newHistory(post, Status.FAILED);
             historyService.newHistory(post, Status.DISABLED);
             post.setProcessed_at(LocalDateTime.now());
-            e.printStackTrace();
+            throw e;
         }
 
         return postRepository.save(post);
     }
 
     public Post disablePost(Integer id) {
-        Post post = fetchPost(id);
+        Post post = postRepository.findById(id).orElseThrow(() ->
+                new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "this post not exists"
+                )
+        );
 
         if (!post.getIsEnabled())
             throw new ResponseStatusException(
@@ -130,34 +135,30 @@ public class PostService {
             historyService.newHistory(post, Status.FAILED);
             historyService.newHistory(post, Status.DISABLED);
             post.setProcessed_at(LocalDateTime.now());
-            e.printStackTrace();
+            throw e;
         }
         return postRepository.save(post);
     }
 
     private void fetchComments(Post post, Integer id) {
-        try {
-            historyService.newHistory(post, Status.COMMENT_FIND);
-            var response = fetch.getForEntity(
-                    Constants.EXTERNAL_API_POST + "/" + id + "/comments",
-                    Comment[].class
-            );
+        historyService.newHistory(post, Status.COMMENT_FIND);
+        var response = fetch.getForEntity(
+                Constants.EXTERNAL_API_POST + "/" + id + "/comments",
+                Comment[].class
+        );
 
-            validateResponse(response);
+        validateResponse(response);
 
-            List<Comment> comments = List.of(Objects.requireNonNull(response.getBody()));
+        List<Comment> comments = List.of(Objects.requireNonNull(response.getBody()));
 
-            // simplify reduce and equals methods
-            post.getComments().clear();
-            post.getComments().addAll(comments);
+        // simplify reduce and equals methods
+        post.getComments().clear();
+        post.getComments().addAll(comments);
 
-            historyService.newHistory(post, Status.COMMENT_OK);
+        historyService.newHistory(post, Status.COMMENT_OK);
 
-            post.setIsEnabled(true);
-            historyService.newHistory(post, Status.ENABLED);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        post.setIsEnabled(true);
+        historyService.newHistory(post, Status.ENABLED);
     }
 
     public void validateResponse(ResponseEntity<?> response) {
