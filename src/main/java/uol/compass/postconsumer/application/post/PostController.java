@@ -31,7 +31,7 @@ public class PostController {
 
     }
 
-    @GetMapping("/{id}")
+    @PostMapping("/{id}")
     public ResponseEntity<?> fetchPost(@PathVariable("id") Integer id) {
         return ResponseEntity.ok(
                 ResponseDTO.ok(postService.fetchPost(id))
