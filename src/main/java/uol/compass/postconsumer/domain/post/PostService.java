@@ -182,13 +182,17 @@ public class PostService {
         }
     }
 
-    public PostResponseDTO<List<Post>> getAll(Integer pageNumber, Integer size, String sortBy, String direction) {
+    public PostResponseDTO<List<Post>> getAll(Integer pageNumber, Integer size, String sortBy, String direction, String disabled) {
         Pageable pageable;
         if (direction.equalsIgnoreCase("asc"))
             pageable = PageRequest.of(pageNumber, size, Sort.Direction.ASC, sortBy);
         else
             pageable = PageRequest.of(pageNumber, size, Sort.Direction.DESC, sortBy);
-        Page<Post> page = postRepository.findAll(pageable);
+        Page<Post> page;
+        if (Boolean.parseBoolean(disabled))
+            page = postRepository.findAll(pageable);
+        else
+            page = postRepository.findAllEnabled(pageable);
 
         return new PostResponseDTO<>(
                 page.getSize(),

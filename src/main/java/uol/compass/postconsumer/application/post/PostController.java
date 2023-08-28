@@ -21,11 +21,12 @@ public class PostController {
             @RequestParam(name = "pageNumber", defaultValue = Constants.PAGE_NUMBER, required = false) Integer pageNumber,
             @RequestParam(name = "size", defaultValue = Constants.PAGE_SIZE, required = false) Integer size,
             @RequestParam(name = "sortBy", defaultValue = Constants.SORT_BY, required = false) String sortBy,
-            @RequestParam(name = "direction", defaultValue = "asc", required = false) String direction
+            @RequestParam(name = "direction", defaultValue = "asc", required = false) String direction,
+            @RequestParam(name = "disabled", defaultValue = "false", required = false) String disabled
     ) {
         return ResponseEntity.ok(
                 new ResponseDTO<>(
-                        postService.getAll(pageNumber, size, sortBy, direction)
+                        postService.getAll(pageNumber, size, sortBy, direction, disabled)
                 )
         );
 
