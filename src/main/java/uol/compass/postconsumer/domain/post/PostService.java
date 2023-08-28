@@ -34,7 +34,17 @@ public class PostService {
         this.historyService = historyService;
     }
 
+    private static void checkId(Integer id) {
+        if (!(id > 0 && id <= 100))
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "id is out of range [1-100]"
+            );
+    }
+
     public Post fetchPost(Integer id) {
+        checkId(id);
+
         Optional<Post> postAlreadyExists = postRepository.findById(id);
         Post post;
         if (postAlreadyExists.isEmpty()) {
