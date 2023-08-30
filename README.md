@@ -7,7 +7,9 @@ This server will receive a request to search a post from https://jsonplaceholder
 
 ## Flow
 
-After request on ```POST /posts/${id}``` an internal flow will be started, fetching the post and assiging histories to him and at end, will be returned the post processed 
+After request on ```POST /posts/${id}``` an internal flow will be started, fetching the post and assiging histories to him and at end, will be returned the post processed
+
+Inside resource folder, has an script to fire 100 curl request to this api and measure the total time to fetch all posts
 
 
 ## API Docs
